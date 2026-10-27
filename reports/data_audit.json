@@ -1,0 +1,38 @@
+{
+  "raw_movies": 4803,
+  "raw_credits": 4803,
+  "matched_credits": 4803,
+  "zero_budget": 1037,
+  "zero_revenue": 1427,
+  "positive_financial_records": 3229,
+  "excluded_budget_below_1000": 13,
+  "modeling_records": 3216,
+  "success_cases": 1803,
+  "below_threshold_cases": 1413,
+  "first_release": "1916-09-04",
+  "last_release": "2016-09-09",
+  "splits": {
+    "train": {
+      "rows": 2433,
+      "from": "1916-09-04",
+      "to": "2010-12-29",
+      "success_rate": 0.5466502260583641
+    },
+    "validation": {
+      "rows": 455,
+      "from": "2011-01-01",
+      "to": "2013-12-27",
+      "success_rate": 0.5912087912087912
+    },
+    "test": {
+      "rows": 328,
+      "from": "2014-01-01",
+      "to": "2016-09-09",
+      "success_rate": 0.6219512195121951
+    }
+  },
+  "source_sha256": {
+    "tmdb_5000_credits.csv": "9d0050599ff88d40366c4841204b1489862bca346bfa46c20b05a65d14508435",
+    "tmdb_5000_movies.csv": "1e0584a8dd374120e4ed4f2b81f0d2bd0eb95a554708e4a350d00ed5c46d2825"
+  }
+}

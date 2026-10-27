@@ -1,0 +1,40 @@
+{
+  "selection": {
+    "regression": "Random Forest",
+    "classification": "Majority baseline"
+  },
+  "test_regression": {
+    "MAE": 93546203.49466674,
+    "RMSE": 175212067.48265058,
+    "R2": 0.5226516614607499
+  },
+  "test_regression_baseline": {
+    "MAE": 155592528.60365853,
+    "RMSE": 286632193.23142874,
+    "R2": -0.27748944433355804
+  },
+  "test_classification": {
+    "Accuracy": 0.6219512195121951,
+    "Precision": 0.6219512195121951,
+    "Recall": 1.0,
+    "F1": 0.7669172932330827,
+    "ROC_AUC": 0.5,
+    "Brier": 0.23979017582008103
+  },
+  "test_classification_baseline": {
+    "Accuracy": 0.6219512195121951,
+    "Precision": 0.6219512195121951,
+    "Recall": 1.0,
+    "F1": 0.7669172932330827,
+    "ROC_AUC": 0.5,
+    "Brier": 0.23979017582008103
+  },
+  "classification_threshold": 0.5,
+  "seed": 42,
+  "versions": {
+    "python": "3.13.7",
+    "sklearn": "1.7.2",
+    "pandas": "2.3.3",
+    "numpy": "2.3.5"
+  }
+}

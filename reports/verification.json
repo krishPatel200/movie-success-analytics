@@ -1,0 +1,13 @@
+{
+  "status": "passed",
+  "checks": [
+    "chronological partitions and disjoint IDs",
+    "forbidden feature exclusion",
+    "financial cleaning and target rule",
+    "saved-model predictions reproduce exported test results",
+    "unknown categories and missing runtime prediction",
+    "all five app pages",
+    "interactive prediction form"
+  ],
+  "modeling_rows": 3216
+}
