@@ -7,8 +7,15 @@ import streamlit as st
 from src.data import ROOT, GENRES, make_features
 
 st.set_page_config(page_title='Box Office Lab',page_icon='🎬',layout='wide')
-st.markdown('''<style>.stApp {background: #101921;} h1,h2,h3 {letter-spacing:-.03em;}
-[data-testid="stMetric"] {background:#1c2c38;padding:18px;border-radius:12px;}
+# Let Streamlit own page/text colors so its light and dark themes stay consistent.
+st.markdown('''<style>
+h1,h2,h3 {letter-spacing:-.03em;}
+[data-testid="stMetric"] {
+    background:var(--secondary-background-color, transparent);
+    padding:18px;
+    border:1px solid rgba(128,128,128,.22);
+    border-radius:12px;
+}
 </style>''',unsafe_allow_html=True)
 
 @st.cache_resource
