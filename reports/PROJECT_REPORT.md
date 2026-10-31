@@ -1,158 +1,125 @@
-# Predictive Box Office Revenue and Movie Success Analytics
+# Movie revenue and success analytics current project report
 
-## Abstract
+Revision v2, 31 October 2026. This report supersedes the v1 baseline-selection results.
+Original v1 results are retained under `reports/archive/` for comparison.
 
-This project investigates historical movie revenue prediction using pre-release-style metadata.
-The supplied TMDB dataset contains 4,803 movie records and matching credits.
-After financial-quality filtering, 3,216 movies remain. We compare four revenue
-estimators and three success classifiers under chronological validation. Random Forest is selected
-for revenue, achieving test MAE of $93,546,203, a 39.9% reduction
-from the median baseline. The majority classifier wins positive-class validation F1; its test
-ROC-AUC of 0.50 demonstrates that success classification has not learned useful movie-specific
-discrimination under the chosen selection rule. These are historical educational findings.
+## Problem and data
 
-## 1. Problem definition
+Predict worldwide box office revenue from pre-release-style movie metadata and estimate
+whether revenue reaches at least twice production budget. This success label is a proxy,
+not audited profit. The supplied TMDB movie and credits files each contain 4,803 rows,
+matched one-to-one by movie ID. Raw inputs are unchanged and checksummed in `data_audit.json`.
 
-Estimate worldwide revenue from movie characteristics and classify whether reported revenue
-is at least twice reported production budget. The binary label is a success proxy, not audited
-profitability. Revenue targets and revenue-derived quantities never enter the feature matrix.
-The intended prediction point is before release, but historical field availability cannot be
-verified from this retrospective metadata snapshot.
+Require positive budget and revenue, a valid release date, and budget of at least $1,000.
+Zero financial values may mean unreported values; do not call all of them failures. The
+budget cutoff excludes 13 suspicious records and is an explicit assumption. There are
+3,216 eligible movies: 1,803 success cases and
+1,413 below-threshold cases. Financial filtering introduces selection bias.
 
-## 2. Dataset and preparation
+## Features and preparation
 
-Source: [TMDB 5000 Movie Dataset](https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata),
-with the two CSV files supplied by the project owner. All 4,803 movie IDs match
-one-to-one. Raw files are unmodified and checksummed in `data_audit.json`.
+`src/data.py` parses genres and credits, extracts the first-listed company and director,
+and constructs 28 named inputs: log budget, runtime, release year, cyclical month coordinates,
+language, company, director, and 20 multi-label genre flags. Cast is parsed but not modeled.
+Actual revenue, success, popularity, ratings, votes and all revenue-derived fields are excluded.
 
-- Raw movie rows: 4,803.
-- Zero budgets: 1,037; zero revenues: 1,427. These groups overlap.
-- Positive budget and revenue rows: 3,229.
-- Additional exclusion: 13 budgets below $1,000, treated as suspicious
-  without assuming a correct replacement. This is a documented filtering assumption.
-- Final rows: 3,216; success proxy: 1,803; below threshold: 1,413.
-- Eligible dates: 1916-09-04 to 2016-09-09.
+`src/train.py` fits median imputation and StandardScaler on numeric columns, one-hot encoding
+with infrequent grouping (minimum count 8) for categories, and unchanged genre indicators.
+These transformations remain inside each saved pipeline. Unknown categories are supported.
+The app calls the same `make_features` function as training.
 
-Rows without observed financial targets are excluded from supervised training, not imputed as
-failures. This causes selection bias toward financially documented films. JSON genres and crew
-are parsed, and director and first-listed production company are extracted. Missing runtime is
-handled by a train-fitted median imputer. Cast names are retained only for possible future work.
+## Experimental design
 
-## 3. Exploratory analysis
+Training uses 2,433 movies through 2010; validation uses 455 releases from 2011–2013.
+The selected pipelines refit on 2,888 train-plus-validation movies. Evaluation uses 328
+releases from 2014–2016. **This historical evaluation period was inspected in v1. It is
+not a new untouched external test for v2.** Model selection in v2 uses validation results
+only; no additional candidates or hyperparameters were chosen from v2 evaluation outcomes.
+New research should obtain a fresh final period.
 
-Revenue is strongly skewed, motivating log-target regression. Budget/revenue plots use logarithmic
-scales to show the full range. Genre comparisons use groups with at least 30 movies; multi-genre
-movies appear in more than one group. Release-month success rates are descriptive, not estimates
-of causal seasonal effects. Coverage is uneven over time and the 2016 snapshot is incomplete.
+Revenue candidates are median baseline, Ridge (alpha 10), Random Forest (180 trees, depth 16,
+minimum leaf 3), and Gradient Boosting (180 stages, rate .04, depth 2, minimum leaf 10, Huber).
+Learned regressors fit log1p revenue and invert with expm1. Revenue selection still minimizes
+validation dollar MAE. Hyperparameters are fixed and seed is 42, not an exhaustive search.
 
-![Budget and revenue](figures/budget_revenue.png)
-![Revenue distribution](figures/revenue_distribution.png)
-![Genre comparison](figures/genre_revenue.png)
-![Seasonality](figures/monthly_success.png)
+Success candidates remain majority prior baseline, Logistic Regression (C .3, max_iter 2500),
+and Random Forest (180 trees, depth 12, minimum leaf 5, seed 42). V1 selected by positive-class
+F1, which favored always predicting the common positive class. V2 instead selects by
+**validation ROC-AUC**, with lower Brier score as the tiebreak. This matches the requirement
+for movie-specific probability ranking. The baseline is a comparison, never silently a personalized
+predictor: training stops if the winner is constant or validation AUC is no better than .50.
+The decision cutoff stays .50; no artificial probability offsets or forced failures are applied.
 
-## 4. Features and models
+## Selection evidence
 
-Numeric inputs are log budget, runtime, release year, sine of release month, and cosine of release
-month. Categorical inputs are original language, primary company, and director. Genres are 20
-binary indicators. One-hot encoding groups infrequent categories and handles unseen categories.
-Scaling, imputation, and vocabulary fitting occur inside the training pipeline.
+Random Forest classification has validation ROC-AUC 0.615 versus 0.590 for Logistic Regression
+and 0.500 for the prior baseline. Its validation positive-class F1 remains lower than the
+baseline's; the metric change reflects a different product objective rather than a claim
+that every score improved. Full comparisons are in the validation CSVs.
 
-Excluded inputs: audience ratings, vote counts, popularity, revenue, success, and any profit/ROI
-measure. No cast/director revenue aggregates are computed, avoiding leakage from future movies.
+Both deployed models are now **Random Forest**. The classifier uses movie features and
+returns probabilities on both sides of .50. Input-option lists now use development records
+only. No separate probability calibration was applied; varying probability is not proof of calibration.
 
-Regression compares a raw-dollar median baseline with log-target Ridge, Random Forest, and
-Gradient Boosting models. Classification compares a majority baseline, Logistic Regression, and
-Random Forest. Hyperparameters are fixed and reproducible (seed 42); this project does not claim
-an exhaustive search. The actual parameter values are in `src/train.py`.
+## Historical evaluation results
 
-## 5. Validation design
-
-| Partition | Years | Rows |
-| --- | --- | ---: |
-| Train | Through 2010 | 2,433 |
-| Validation | 2011–2013 | 455 |
-| Final test | 2014–2016 | 328 |
-
-Select minimum validation revenue MAE and maximum validation positive-class F1, including the
-baseline as an eligible candidate. Refit winners through 2013 and evaluate on the final test.
-The classification threshold is fixed at 0.50. Preprocessing is refitted only on train + validation
-for final models. Test data is not used for selection or parameter adjustment.
-
-### Revenue validation (currency metrics in USD)
-
-| Model | MAE | RMSE | R2 |
-| --- | --- | --- | --- |
-| Random Forest | 76507892.9134 | 145538925.4099 | 0.5617 |
-| Gradient Boosting | 82441694.2262 | 162377888.6511 | 0.4544 |
-| Ridge | 92574656.1802 | 183902517.9874 | 0.3002 |
-| Median baseline | 125604093.0088 | 240674448.7247 | -0.1986 |
-
-### Classification validation
-
-| Model | Accuracy | Precision | Recall | F1 | ROC_AUC | Brier |
-| --- | --- | --- | --- | --- | --- | --- |
-| Majority baseline | 0.5912 | 0.5912 | 1.0000 | 0.7431 | 0.5000 | 0.2437 |
-| Random Forest | 0.5780 | 0.6681 | 0.5688 | 0.6145 | 0.6150 | 0.2404 |
-| Logistic Regression | 0.5077 | 0.6510 | 0.3606 | 0.4641 | 0.5896 | 0.2628 |
-
-## 6. Final test results
-
-| Revenue metric | Selected Random Forest | Median baseline |
+| Classification metric | Random Forest v2 | Prior baseline |
 | --- | ---: | ---: |
-| MAE | $93,546,203 | $155,592,529 |
-| RMSE | $175,212,067 | $286,632,193 |
-| R² | 0.523 | -0.277 |
+| Accuracy | 0.6433 | 0.6220 |
+| Precision | 0.6835 | 0.6220 |
+| Recall | 0.7941 | 1.0000 |
+| Positive-class F1 | 0.7347 | 0.7669 |
+| Macro-F1 | 0.5953 | 0.3835 |
+| Balanced accuracy | 0.5946 | 0.5000 |
+| ROC-AUC | 0.6688 | 0.5000 |
+| Brier score | 0.2260 | 0.2398 |
 
-The revenue model reduces MAE by 39.9%. Error remains large in practical terms.
-RMSE above MAE indicates some large misses; log-target models can underpredict very large grosses.
+The revised classifier has modest discrimination, with lower probability error than the
+baseline on this historical comparison. Positive-class F1 decreases because it no longer
+predicts every movie as successful. It improves macro-F1 and balanced accuracy. Revenue
+results remain approximately MAE $93,546,203, RMSE $175,212,067, and R² 0.523.
+The median revenue baseline MAE is $155.59M; the forest reduces MAE by about 39.9% relative to that baseline.
 
-![Actual versus predicted](figures/actual_predicted.png)
-![Residuals](figures/residuals.png)
-
-The selected classification model is **Majority baseline**. Test accuracy is
-62.2%, F1 is 0.767, ROC-AUC is
-0.500, and Brier score is 0.240.
-It predicts the majority class for every movie and returns a constant probability equal to the
-development-set class frequency. This is not evidence of learned success prediction. Its F1 is
-high because the positive class is common and recall is 1.0. The app explicitly discloses this.
-
-![Confusion matrix](figures/confusion_matrix.png)
+![Success confusion matrix](figures/confusion_matrix.png)
 ![ROC curve](figures/roc_curve.png)
 
-## 7. Interpretation and errors
+## Interpretation and examples
 
-![Revenue importance](figures/revenue_importance.png)
+Permutation importance uses the original train-only fitted model on validation records.
+Success importance now uses ROC-AUC rather than positive-class F1; revenue still uses MAE.
+Importance measures associations, not causes or a personalized explanation.
 
-Permutation importance measures validation performance degradation when a feature is shuffled.
-It is global and computed on the original train-only model. Correlated features can dilute one
-another's importance. Baseline-classifier importance is zero because it ignores all inputs.
-Individual mistakes are exported in `test_predictions.csv` and `largest_errors.csv`.
+`prediction_examples.json` stores hypothetical scenarios demonstrating probabilities below
+and above .50. They are selected from a fixed input grid, not real films with validated
+future outcomes. For example, $15M budget, 90 minutes, Drama, English, June 2013, Unknown
+company and director gives approximately 43.1%; $1M, 140 minutes, Horror with the same
+date/language/unknown identities gives approximately 60.5%.
 
-## 8. Application and reproducibility
+The app labels the independent classifier decision, the below-threshold probability, and
+the separate comparison of point-estimated revenue against 2x budget. It warns if the two
+models disagree. A point estimate below a threshold does not mathematically require a
+separately fitted classifier probability below .50.
 
-The Streamlit application includes overview, prediction, filtered exploration, evaluation, and
-methodology pages. It uses the saved full preprocessing/model pipelines and the same feature
-constructor as training. Unknown categories and missing numeric values are supported. Prediction
-and filtered-data downloads are available. Python/package versions are recorded in the metrics
-and lock file. See the root README for setup and training commands.
+## Software tests and operation
 
-## 9. Limitations and future work
+Run `python -m src.train` to regenerate results; run `python verify_project.py` to verify
+temporal isolation, target rules, saved-model/export agreement, unknown inputs, nonconstant
+probabilities, both sides of .50, validation AUC selection, all app pages, and the actual
+form with below/above-threshold examples. Model/data cache keys change with this revision.
+The app loads saved pipelines rather than retraining per request.
 
-Financial fields may contain errors and missingness. All money is treated as nominal USD without
-inflation adjustment. Data is historical and selected, and 2016 coverage is partial. Metadata was
-not independently verified against pre-release timestamps. Marketing spending, distribution,
-competition, and audience demand are absent. Success is not actual profit. Probabilities are not
-separately calibrated and no predictive interval is claimed. The final deployed models train
-through 2013; contemporary inputs are extrapolations.
+## Limits
 
-Next research should predefine macro-F1/balanced accuracy and ranking/calibration objectives for
-classification; acquire more recent and informative data; add strictly historical director/cast
-track records; and evaluate on a new untouched test set. The present test must not be reused for
-iterative model selection. Deep learning and time-series models were not needed for this tabular,
-movie-level problem.
+The sample is selected and historical, money is nominal without inflation adjustment,
+and financial reporting may be incomplete. Pre-release availability of retrospective fields
+was not independently timestamp-verified. Marketing, theaters, audience demand and competition
+are absent. Probability calibration is unverified, and .669 AUC is not strong production
+forecasting evidence. The reused evaluation set must not be called a fresh independent test.
 
-## 10. Conclusion
+## Sources
 
-The project delivers a reproducible ML workflow and functioning demonstration. Revenue prediction
-beats the simple baseline but has material uncertainty. Success classification does not beat a
-majority predictor under the selected F1 criterion, and this negative finding is reported openly.
+- Project: https://github.com/krishPatel200/movie-success-analytics
+- Data: https://www.kaggle.com/datasets/tmdb/tmdb-movie-metadata
+- Metrics: `metrics.json`; selection: `classification_validation.csv`.
+- AUC: https://scikit-learn.org/1.7/modules/generated/sklearn.metrics.roc_auc_score.html
+- Probability calibration: https://scikit-learn.org/1.7/modules/calibration.html

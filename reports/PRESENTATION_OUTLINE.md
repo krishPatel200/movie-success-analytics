@@ -1,32 +1,15 @@
-# Presentation outline and demonstration
+# Presentation outline for revision v2
 
-1. **Title and team:** Predictive Box Office Revenue and Movie Success Analytics.
-2. **Problem:** worldwide revenue regression plus a transparent binary success proxy.
-3. **Data:** 4,803 movies and matching credits; 3,216 eligible records after documented filtering.
-4. **Preparation:** JSON parsing, invalid finances, encoding, and shared preprocessing pipelines.
-5. **EDA:** budget/revenue, skewed revenue, genre patterns; association does not imply causation.
-6. **Feature design:** pre-release-style fields; exclude popularity, ratings, votes, and revenue-derived features.
-7. **Experimental design:** temporal train/validation/test, fixed parameters, baseline comparisons.
-8. **Regression:** show validation comparison and held-out plots. MAE $93.5M versus $155.6M baseline.
-9. **Classification:** majority baseline wins F1; AUC 0.50 means no discrimination. Explain why F1 alone can mislead.
-10. **Demo and future work:** show one scenario, filtered movies, results, limitations, and next research steps.
+1. Problem: revenue and 2x-budget success proxy; not audited profitability.
+2. Data: 4,803 raw, 3,216 eligible; financial exclusions and their bias.
+3. Features: 28 inputs; no ratings/popularity/revenue leakage.
+4. Chronology: train through 2010; validate 2011–2013; refit through 2013.
+5. Revenue: validation MAE selects Random Forest; historical MAE $93.55M vs $155.59M baseline.
+6. Original classifier defect: positive F1 selected a constant prior.
+7. V2 correction: select by validation ROC-AUC; Random Forest wins .615.
+8. Historical classifier results: accuracy 64.3%, AUC 0.669; modest discrimination.
+9. Demo: use the below/above-50 examples in V2_CLASSIFICATION_VIVA.md; show both independent outcomes.
+10. Limits: uncalibrated probabilities, old/selected data and reused evaluation period; need fresh data.
 
-## Three-minute demo
-
-- Open Overview and state sample size and historical coverage.
-- Open Predict a movie; use a $30M budget, Drama, 110 minutes, and June 2015.
-- Submit; explain that revenue is individualized while selected success probability is constant.
-- Change budget to $60M and compare revenue; do not claim causal effects.
-- Explore a genre/year filter and download rows.
-- Show test results, the baseline comparison, confusion matrix, and limitations.
-
-## Questions to prepare for
-
-- Why regression and classification? Different targets: a continuous gross and a defined binary proxy.
-- Why chronological splitting? It better simulates future-release prediction than random mixing.
-- Why exclude ratings? Their retrospective values would reveal post-release information.
-- Why log revenue? To handle skew; it can trade blockbuster dollar accuracy for typical-film fit.
-- Is 2x budget profitability? No; marketing and revenue sharing are absent.
-- Why is classifier F1 high but AUC 0.5? It always predicts success, achieving high recall without ranking movies.
-- Why no deep learning? Small tabular data and a one-day scope favor reproducible traditional models.
-- Can this predict a 2026 blockbuster reliably? That has not been established on this historical sample.
+Do not claim v2 was evaluated on a newly untouched external test. Do not present the old
+24-page guide's constant-classifier result as the current implementation.

@@ -19,12 +19,12 @@ h1,h2,h3 {letter-spacing:-.03em;}
 </style>''',unsafe_allow_html=True)
 
 @st.cache_resource
-def load_models():
+def load_models(model_revision):
     return (joblib.load(ROOT/'models/revenue_pipeline.joblib'),
             joblib.load(ROOT/'models/success_pipeline.joblib'))
 
 @st.cache_data
-def load_results():
+def load_results(result_signature):
     clean=pd.read_csv(ROOT/'data/processed/movies_clean.csv')
     clean['genres_list']=clean.genres_list.map(json.loads)
     return (clean,json.loads((ROOT/'reports/metrics.json').read_text()),
@@ -35,8 +35,8 @@ if not (ROOT/'models/revenue_pipeline.joblib').exists():
     st.error('Train the models first: python -m src.train')
     st.stop()
 
-clean,metrics,audit,options=load_results()
-reg,clf=load_models()
+clean,metrics,audit,options=load_results((ROOT/'reports/metrics.json').stat().st_mtime_ns)
+reg,clf=load_models(metrics.get('model_revision','v1'))
 st.caption('DATA SCIENCE / MACHINE LEARNING / TMDB')
 st.title('Box Office Lab')
 st.write('Explore historical movies, estimate revenue, and inspect how the models perform.')
@@ -47,14 +47,15 @@ if page=='Overview':
     a,b,c=st.columns(3)
     a.metric('Raw movies',f"{audit['raw_movies']:,}")
     b.metric('Modeling records',f"{audit['modeling_records']:,}")
-    c.metric('Held-out movies',f"{audit['splits']['test']['rows']:,}")
+    c.metric('Historical evaluation movies',f"{audit['splits']['test']['rows']:,}")
+    st.caption(metrics.get('evaluation_note',''))
     st.subheader('Two questions, two models')
     st.write('Revenue regression estimates worldwide gross. Classification estimates whether gross reaches twice the production budget.')
     if metrics['selection']['classification']=='Majority baseline':
         st.warning('The majority baseline won validation F1. The deployed success estimate is the same training-set rate for every movie, not an individualized forecast. Test ROC-AUC is 0.50.')
     a,b=st.columns(2)
     a.metric('Test revenue MAE',f"${metrics['test_regression']['MAE']/1e6:,.1f}M")
-    b.metric('Test success F1',f"{metrics['test_classification']['F1']:.3f}")
+    b.metric('Success ROC-AUC',f"{metrics['test_classification']['ROC_AUC']:.3f}")
     st.image(str(ROOT/'reports/figures/budget_revenue.png'))
     st.info('The success label is a revenue-to-budget proxy. It does not measure audited profit.')
 
@@ -85,16 +86,22 @@ elif page=='Predict a movie':
             revenue=max(0,float(reg.predict(X)[0])); probability=float(clf.predict_proba(X)[0,1])
             a,b,c=st.columns(3)
             a.metric('Estimated worldwide revenue',f'${revenue/1e6:,.1f}M')
-            b.metric('Estimated success probability',f'{probability:.1%}')
+            b.metric('Model-estimated success probability',f'{probability:.1%}')
             c.metric('Success threshold',f'${2*budget/1e6:,.1f}M')
-            st.write('Classifier decision: **'+('Success proxy' if probability>=.5 else 'Below threshold')+'** (probability cutoff 0.50).')
+            threshold=float(metrics.get('classification_threshold',0.5))
+            st.write('Classifier decision: **'+('Likely to reach success threshold' if probability>=threshold else 'Likely below success threshold')+f'** (probability cutoff {threshold:.2f}).')
+            st.caption(f'Estimated probability of staying below the threshold: {1-probability:.1%}.')
+            revenue_meets_threshold = revenue >= 2*budget
+            st.write('Revenue-based comparison: **'+('At or above' if revenue_meets_threshold else 'Below')+'** the 2× budget threshold.')
+            if revenue_meets_threshold != (probability>=threshold):
+                st.info('The point revenue estimate and the separate success classifier disagree for this scenario. Neither is a guaranteed outcome.')
             st.caption('Revenue and success are separate models, so their outputs may disagree. Probabilities have not been separately calibrated. No guaranteed revenue range is claimed.')
             if date.year>options['training_last_year']:
                 st.warning('This release year is later than the training period. Treat the result as a historical-model scenario; reliability on current releases is unverified.')
             if budget>options['budget_max'] or budget<options['budget_min']:
                 st.warning('Budget is outside the final training data range.')
             payload=scenario.to_dict(orient='records')[0]
-            payload.update(predicted_revenue_usd=revenue,success_probability=probability)
+            payload.update(predicted_revenue_usd=revenue,success_probability=probability,below_threshold_probability=1-probability,success_threshold_usd=2*budget,revenue_meets_threshold=revenue_meets_threshold,model_revision=metrics.get('model_revision','v1'))
             st.download_button('Download this prediction',json.dumps(payload,indent=2),'movie_prediction.json','application/json')
     st.subheader('What influenced the model overall?')
     st.image(str(ROOT/'reports/figures/revenue_importance.png'))
@@ -124,10 +131,11 @@ elif page=='Explore the data':
 
 elif page=='Model evaluation':
     st.subheader('Validation comparisons')
-    st.caption('Train: through 2010. Validation: 2011–2013. Select by revenue MAE and classification F1; then refit on train + validation.')
+    st.caption('Train: through 2010. Validation: 2011–2013. Select by revenue MAE and classification ROC-AUC; then refit on train + validation.')
     st.dataframe(pd.read_csv(ROOT/'reports/regression_validation.csv'),hide_index=True)
     st.dataframe(pd.read_csv(ROOT/'reports/classification_validation.csv'),hide_index=True)
-    st.subheader('Final held-out test: 2014–2016')
+    st.subheader('Historical evaluation: 2014–2016')
+    st.caption(metrics.get('evaluation_note',''))
     st.write('Revenue model: **'+metrics['selection']['regression']+'**. Success model: **'+metrics['selection']['classification']+'**.')
     if metrics['selection']['classification']=='Majority baseline':
         st.warning('A majority predictor can score well on positive-class F1 while having no ranking ability. Interpret its F1 alongside ROC-AUC = 0.50 and the confusion matrix. Future work should predefine balanced accuracy or macro-F1 and collect more informative features, then use a fresh test set.')
@@ -147,7 +155,8 @@ else:
 3. Build budget, runtime, year, seasonal, language, company, director, and multi-label genre features.
 4. Split chronologically; fit preprocessing only on the relevant training partition.
 5. Compare log-target regressors and binary classifiers against simple baselines.
-6. Select on validation, refit through 2013, and evaluate once on 2014–2016 releases.
+6. Select revenue by validation MAE and classification by validation ROC-AUC (Brier tiebreak).
+7. Refit through 2013 and compare on 2014–2016 releases. This historical set was evaluated in v1 and is not a fresh external test for v2.
 
 **Limitations:** selected TMDB sample, uncertain financial reporting, missing financial data,
 historical nominal currencies without inflation adjustment, incomplete 2016 coverage,

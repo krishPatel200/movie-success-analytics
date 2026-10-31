@@ -20,7 +20,7 @@ from sklearn.linear_model import Ridge, LogisticRegression
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, RandomForestClassifier
 from sklearn.metrics import (mean_absolute_error, mean_squared_error, r2_score,
     accuracy_score, precision_score, recall_score, f1_score, roc_auc_score,
-    brier_score_loss, ConfusionMatrixDisplay, RocCurveDisplay)
+    brier_score_loss, balanced_accuracy_score, ConfusionMatrixDisplay, RocCurveDisplay)
 from sklearn.inspection import permutation_importance
 from src.data import ROOT, NUMERIC, CATEGORICAL, GENRE_COLS, make_features, load_data, split_data
 
@@ -55,6 +55,8 @@ def cls_metrics(y, prediction, probability):
             'Precision': float(precision_score(y, prediction, zero_division=0)),
             'Recall': float(recall_score(y, prediction, zero_division=0)),
             'F1': float(f1_score(y, prediction, zero_division=0)),
+            'Macro_F1': float(f1_score(y, prediction, average='macro', zero_division=0)),
+            'Balanced_Accuracy': float(balanced_accuracy_score(y, prediction)),
             'ROC_AUC': float(roc_auc_score(y, probability)),
             'Brier': float(brier_score_loss(y, probability))}
 
@@ -136,10 +138,15 @@ def main():
         print('Validation classification:',name,flush=True)
         model.fit(Xtr,train.success)
         cls_rows.append({'Model':name,**cls_metrics(validation.success,model.predict(Xv),model.predict_proba(Xv)[:,1])})
-    reg_table=pd.DataFrame(reg_rows).sort_values('MAE'); cls_table=pd.DataFrame(cls_rows).sort_values('F1',ascending=False)
+    reg_table=pd.DataFrame(reg_rows).sort_values('MAE'); cls_table=pd.DataFrame(cls_rows).sort_values(['ROC_AUC','Brier'],ascending=[False,True])
     reg_table.to_csv(REPORTS/'regression_validation.csv',index=False)
     cls_table.to_csv(REPORTS/'classification_validation.csv',index=False)
-    # Keep baseline eligible: a complex model must earn its selection.
+    # Rank success probabilities by validation discrimination, not positive-class F1.
+    # Keep the constant baseline in comparisons, but never silently deploy it as
+    # individualized predictions. No test values participate in this selection.
+    best_classifier = cls_table.iloc[0]
+    if best_classifier.Model == 'Majority baseline' or best_classifier.ROC_AUC <= 0.5:
+        raise RuntimeError('No classifier beat chance validation ranking; do not publish individualized success estimates.')
     reg_name=reg_table.iloc[0].Model; cls_name=cls_table.iloc[0].Model
     combined=pd.concat([train,validation],ignore_index=True); Xdev=make_features(combined)
     reg=clone(regressors[reg_name]).fit(Xdev,combined.revenue)
@@ -148,7 +155,11 @@ def main():
     labels=clf.predict(Xt)
     baseline_reg=DummyRegressor(strategy='median').fit(np.zeros((len(combined),1)),combined.revenue)
     baseline_cls=DummyClassifier(strategy='prior').fit(np.zeros((len(combined),1)),combined.success)
-    result={'selection':{'regression':reg_name,'classification':cls_name},
+    result={'model_revision':'v2-auc-selection',
+            'selection_criteria':{'regression':'validation MAE ascending','classification':'validation ROC_AUC descending; Brier ascending tiebreak'},
+            'evaluation_note':'2014-2016 historical comparison set reused after v1; not a new untouched external test. No tuning on this set.',
+            'probability_calibration':'No separate probability calibration; estimates are exploratory.',
+            'selection':{'regression':reg_name,'classification':cls_name},
             'test_regression':reg_metrics(test.revenue,predictions),
             'test_regression_baseline':reg_metrics(test.revenue,baseline_reg.predict(np.zeros((len(test),1)))),
             'test_classification':cls_metrics(test.success,labels,probability),
@@ -170,21 +181,21 @@ def main():
     plt.axhline(0,color='#d48b35',ls='--'); plt.xlabel('Predicted revenue (USD millions)')
     plt.ylabel('Actual minus predicted (USD millions)'); plt.title('Held-out test residuals'); savefig('residuals')
     ConfusionMatrixDisplay.from_predictions(test.success,labels,display_labels=['Below threshold','Success proxy'],cmap='Blues')
-    plt.title('Held-out test confusion matrix'); savefig('confusion_matrix')
+    plt.title('Historical evaluation confusion matrix'); savefig('confusion_matrix')
     RocCurveDisplay.from_predictions(test.success,probability,name=cls_name)
-    plt.plot([0,1],[0,1],'--',color='gray'); plt.title('Held-out test ROC curve'); savefig('roc_curve')
+    plt.plot([0,1],[0,1],'--',color='gray'); plt.title('Historical evaluation ROC curve'); savefig('roc_curve')
     # Interpretation uses validation data and train-only fitted models, not test-driven selection.
     for kind,model,score,target in [('revenue',regressors[reg_name],'neg_mean_absolute_error',validation.revenue),
-                                    ('success',classifiers[cls_name],'f1',validation.success)]:
+                                    ('success',classifiers[cls_name],'roc_auc',validation.success)]:
         importance=permutation_importance(model,Xv,target,scoring=score,n_repeats=3,random_state=SEED,n_jobs=1)
         table=pd.DataFrame({'Feature':Xv.columns,'Importance':importance.importances_mean,'Std':importance.importances_std}).sort_values('Importance',ascending=False)
         table.to_csv(REPORTS/f'{kind}_importance.csv',index=False)
         top=table.head(10).sort_values('Importance'); plt.barh(top.Feature,top.Importance,color='#267c91')
-        plt.xlabel('Increase in MAE (USD)' if kind=='revenue' else 'Decrease in F1')
+        plt.xlabel('Increase in MAE (USD)' if kind=='revenue' else 'Decrease in ROC-AUC')
         plt.title(f'{kind.title()}: validation permutation importance'); savefig(f'{kind}_importance')
-    options={'languages':sorted(clean.original_language.unique().tolist()),
-             'companies':sorted(clean.primary_company.value_counts().head(80).index.tolist()),
-             'directors':sorted(clean.director.value_counts().head(100).index.tolist()),
+    options={'languages':sorted(combined.original_language.unique().tolist()),
+             'companies':sorted(combined.primary_company.value_counts().head(80).index.tolist()),
+             'directors':sorted(combined.director.value_counts().head(100).index.tolist()),
              'budget_min':float(combined.budget.min()),'budget_max':float(combined.budget.max()),
              'training_last_year':int(combined.release_year.max())}
     (ROOT/'models/input_options.json').write_text(json.dumps(options,indent=2),encoding='utf-8')

@@ -1,0 +1,57 @@
+{
+  "note": "Hypothetical input examples selected from a fixed scenario grid; these are predictions, not validated movie outcomes. Company and director are Unknown. Probabilities are not separately calibrated.",
+  "examples": [
+    {
+      "budget": 15000000,
+      "runtime": 90,
+      "release_year": 2013,
+      "release_month": 6,
+      "original_language": "en",
+      "primary_company": "Unknown",
+      "director": "Unknown",
+      "genres_list": [
+        "Drama"
+      ],
+      "success_probability": 0.43128617786821283
+    },
+    {
+      "budget": 50000000,
+      "runtime": 90,
+      "release_year": 2013,
+      "release_month": 6,
+      "original_language": "en",
+      "primary_company": "Unknown",
+      "director": "Unknown",
+      "genres_list": [
+        "Drama"
+      ],
+      "success_probability": 0.4357741548362535
+    },
+    {
+      "budget": 150000000,
+      "runtime": 140,
+      "release_year": 2013,
+      "release_month": 6,
+      "original_language": "en",
+      "primary_company": "Unknown",
+      "director": "Unknown",
+      "genres_list": [
+        "Horror"
+      ],
+      "success_probability": 0.5944670501208289
+    },
+    {
+      "budget": 1000000,
+      "runtime": 140,
+      "release_year": 2013,
+      "release_month": 6,
+      "original_language": "en",
+      "primary_company": "Unknown",
+      "director": "Unknown",
+      "genres_list": [
+        "Horror"
+      ],
+      "success_probability": 0.6052317122685418
+    }
+  ]
+}

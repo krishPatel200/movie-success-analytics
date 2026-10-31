@@ -1,12 +1,19 @@
 {
+  "model_revision": "v2-auc-selection",
+  "selection_criteria": {
+    "regression": "validation MAE ascending",
+    "classification": "validation ROC_AUC descending; Brier ascending tiebreak"
+  },
+  "evaluation_note": "2014-2016 historical comparison set reused after v1; not a new untouched external test. No tuning on this set.",
+  "probability_calibration": "No separate probability calibration; estimates are exploratory.",
   "selection": {
     "regression": "Random Forest",
-    "classification": "Majority baseline"
+    "classification": "Random Forest"
   },
   "test_regression": {
-    "MAE": 93546203.49466674,
-    "RMSE": 175212067.48265058,
-    "R2": 0.5226516614607499
+    "MAE": 93546203.49466677,
+    "RMSE": 175212067.4826507,
+    "R2": 0.5226516614607493
   },
   "test_regression_baseline": {
     "MAE": 155592528.60365853,
@@ -14,18 +21,22 @@
     "R2": -0.27748944433355804
   },
   "test_classification": {
-    "Accuracy": 0.6219512195121951,
-    "Precision": 0.6219512195121951,
-    "Recall": 1.0,
-    "F1": 0.7669172932330827,
-    "ROC_AUC": 0.5,
-    "Brier": 0.23979017582008103
+    "Accuracy": 0.6432926829268293,
+    "Precision": 0.6835443037974683,
+    "Recall": 0.7941176470588235,
+    "F1": 0.7346938775510204,
+    "Macro_F1": 0.5952539155196963,
+    "Balanced_Accuracy": 0.594639468690702,
+    "ROC_AUC": 0.6688409234661608,
+    "Brier": 0.22603072569051788
   },
   "test_classification_baseline": {
     "Accuracy": 0.6219512195121951,
     "Precision": 0.6219512195121951,
     "Recall": 1.0,
     "F1": 0.7669172932330827,
+    "Macro_F1": 0.38345864661654133,
+    "Balanced_Accuracy": 0.5,
     "ROC_AUC": 0.5,
     "Brier": 0.23979017582008103
   },

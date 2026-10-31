@@ -5,9 +5,11 @@
     "forbidden feature exclusion",
     "financial cleaning and target rule",
     "saved-model predictions reproduce exported test results",
+    "nonconstant success probabilities above and below 50%",
+    "classifier selection follows validation AUC",
     "unknown categories and missing runtime prediction",
     "all five app pages",
-    "interactive prediction form"
+    "interactive prediction form with below/above-50 scenarios"
   ],
   "modeling_rows": 3216
 }

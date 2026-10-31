@@ -2,7 +2,10 @@
 
 A complete data science project using the supplied TMDB 5000 movie and credits datasets.
 It includes reproducible cleaning, exploratory analysis, temporal model comparison,
-saved regression/classification pipelines, held-out evaluation, and a Streamlit demo.
+saved regression/classification pipelines, historical evaluation, and a Streamlit demo.
+
+**Current revision: v2.** Both deployed estimators are Random Forest models. Success
+probabilities now depend on movie inputs. See [the classifier revision and viva notes](reports/V2_CLASSIFICATION_VIVA.md).
 
 ## Start the demo on Windows
 
@@ -54,16 +57,20 @@ The notebook in `notebooks/` walks through the same workflow and displays saved 
 - Compare median baseline, Ridge, Random Forest, and Gradient Boosting regression.
   Non-baseline regressors train on log1p revenue; predictions invert with expm1.
 - Compare majority baseline, Logistic Regression, and Random Forest classification.
-- Select regression by lowest validation dollar MAE and classification by highest validation F1.
+- Select regression by lowest validation dollar MAE and classification by highest validation ROC-AUC
+  (lowest Brier score breaks an AUC tie). Training fails rather than publishing a constant/chance classifier as individualized predictions.
   Hyperparameters are fixed in the source; no extensive search or test-driven tuning is claimed.
-- Refit winners on train + validation, then evaluate once on the final test period.
-- Report MAE/RMSE/R² and accuracy/precision/recall/F1/ROC-AUC/Brier score.
+- Refit winners on train + validation, then evaluate on the historical 2014–2016 period.
+  That period was already evaluated in v1; v2 results are a reused historical comparison,
+  not a new untouched external test. Selection still uses validation only.
+- Report MAE/RMSE/R² and accuracy/precision/recall/F1/macro-F1/balanced accuracy/ROC-AUC/Brier score.
 - Permutation importance uses validation data and the original train-only fitted model.
   It describes global predictive associations, not causal effects or individual explanations.
 
 Success is `revenue >= 2 * budget`. It is a commercial-success proxy, not audited profitability.
 Classifier threshold is fixed at 0.50; probabilities are not separately calibrated.
-Separate revenue and success models can produce different conclusions.
+Separate revenue and success models can produce different conclusions. The app displays
+  the point-revenue threshold comparison independently and explicitly flags disagreement.
 
 ## Files
 
